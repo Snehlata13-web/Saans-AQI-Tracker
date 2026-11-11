@@ -247,7 +247,7 @@ export default function App() {
             {aq && <>
               {tab === 'overview' && <Dashboard loc={loc} aq={aq} wx={wx} station={station} onShare={() => setShare(true)} go={go} scale={sc} onScale={() => setSc(sc === 'IN' ? 'US' : 'IN')} />}
               {tab === 'forecast' && <Forecast loc={loc} aq={aq} wx={wx} />}
-              {tab === 'assistant' && <Assistant loc={loc} aq={aq} wx={wx} station={station} />}
+              {tab === 'assistant' && <Assistant loc={loc} aq={aq} wx={wx} station={station} onPick={pick} />}
               {share && <ShareCard loc={loc} aq={aq} onClose={() => setShare(false)} />}
             </>}
           </Suspense></Boundary>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Card, Tag } from './ui'
 import { category, round, POLLUTANTS, fmtHour, scaleName, polLabel } from '../lib/aqi'
 import { insights, contextFor } from '../lib/insights'
+import { geocode } from '../lib/api'
 
 const SUGGEST = ['Is it safe to go for a run now?', 'Should my kids play outside?', 'When is the best time to go out today?', 'What is PM2.5?', 'Will air get worse tomorrow?', 'Kya mujhe mask pehenna chahiye?']
 
@@ -43,7 +44,22 @@ function localAnswer(q, { aq, wx, loc }) {
   return `${now}. ${category(c.us_aqi).general}`
 }
 
-export default function Assistant({ aq, wx, station, loc }) {
+function locationFromMessage(text) {
+  const match = text.match(/^\s*(?:i['’]?m|i am|i live|main|मैं)\s+(?:currently\s+)?(?:in|at|near|में|मे)\s+(.+?)\s*[.!?]?\s*$/i)
+  return match?.[1] || null
+}
+
+async function findLocation(place) {
+  const queries = [place]
+  const words = place.split(/\s+/)
+  if (words.length > 1) queries.push(words.slice(-2).join(' '))
+  if (/patna|bihar/i.test(place)) queries.push('Patna')
+  const results = (await Promise.all(queries.map((query) => geocode(query)))).flat()
+  const india = results.find((result) => /india/i.test(result.country || ''))
+  return india || results[0]
+}
+
+export default function Assistant({ aq, wx, station, loc, onPick }) {
   const [msgs, setMsgs] = useState([{ role: 'assistant', content: `Namaste! 🙏 I'm SAANS AI. Ask me anything about the air in ${loc.name} — by typing or with the 🎙️ mic.` }])
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
@@ -69,16 +85,30 @@ export default function Assistant({ aq, wx, station, loc }) {
     const next = [...msgs, { role: 'user', content: text }]
     setMsgs(next); setQ(''); setBusy(true)
     let answer
+    const place = locationFromMessage(text)
     try {
-      const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: next.slice(1), context: contextFor(aq, wx, station, loc) }) })
-      if (!r.ok) throw new Error(r.status)
-      const j = await r.json()
-      if (!j.text) throw new Error(j.error || 'no text')
-      answer = j.text
-      setMode(j.model ? (j.model.startsWith('gemini') ? 'Gemini · ' : 'LLM · ') + j.model : 'LLM')
+      if (place && onPick) {
+        const result = await findLocation(place)
+        if (!result) throw new Error('Location not found')
+        onPick(result)
+        answer = `Location updated to ${result.name}${result.admin ? `, ${result.admin}` : ''}. The live air-quality data is refreshing now.`
+        setMode('location')
+      } else {
+        const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: next.slice(1), context: contextFor(aq, wx, station, loc) }) })
+        if (!r.ok) throw new Error(r.status)
+        const j = await r.json()
+        if (!j.text) throw new Error(j.error || 'no text')
+        answer = j.text
+        setMode(j.model ? (j.model.startsWith('gemini') ? 'Gemini · ' : 'LLM · ') + j.model : 'LLM')
+      }
     } catch {
-      answer = localAnswer(text, { aq, wx, loc })
-      setMode('built-in engine')
+      if (place) {
+        answer = `I couldn't find “${place}”. Please try a nearby city or district name.`
+        setMode('location error')
+      } else {
+        answer = localAnswer(text, { aq, wx, loc })
+        setMode('built-in engine')
+      }
     }
     setMsgs((m) => [...m, { role: 'assistant', content: answer }])
     setBusy(false)
