@@ -1,0 +1,10 @@
+{
+  "name": "SAANS — Air Quality Intelligence",
+  "short_name": "SAANS",
+  "description": "Real-time AQI, 3D pollution globe, forecasts, AI assistant and smart alerts.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#03040b",
+  "theme_color": "#03040b",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
