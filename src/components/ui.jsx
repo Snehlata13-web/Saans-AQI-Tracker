@@ -5,11 +5,18 @@ import { category } from '../lib/aqi'
 export class Boundary extends Component {
   constructor(p) { super(p); this.state = { err: null } }
   static getDerivedStateFromError(err) { return { err } }
+  retry = () => {
+    if (/dynamically imported module|failed to fetch/i.test(String(this.state.err?.message || this.state.err))) {
+      window.location.reload()
+      return
+    }
+    this.setState({ err: null })
+  }
   render() {
     if (!this.state.err) return this.props.children
     return this.props.fallback ?? (
       <div className="errbox">⚠️ This section couldn't load on this device ({String(this.state.err.message || this.state.err).slice(0, 80)}).
-        <button className="btn sm" onClick={() => this.setState({ err: null })}>Retry</button></div>
+        <button className="btn sm" onClick={this.retry}>Retry</button></div>
     )
   }
 }
